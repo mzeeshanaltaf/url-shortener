@@ -394,7 +394,13 @@
       opacity: 0;
       transition: max-height .3s ease, opacity .25s ease, margin .3s ease;
     }
-    .alias-wrap.open { max-height: 90px; opacity: 1; margin-bottom: 4px; }
+    .alias-wrap.open { max-height: 120px; opacity: 1; margin-bottom: 4px; }
+
+    .alias-hint {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-bottom: 4px;
+    }
 
     .alias-row {
       display: flex;
@@ -874,6 +880,7 @@
               autocomplete="off"
             />
           </div>
+          <p class="alias-hint">2–50 chars: letters, numbers, hyphens, and underscores only.</p>
           <div class="field-error" id="aliasError">That alias is already taken — try another.</div>
         </div>
 
