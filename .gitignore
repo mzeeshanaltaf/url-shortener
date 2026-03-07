@@ -1,0 +1,5 @@
+# Private config used only for local testing (not needed for Vercel deployment)
+config.js
+
+# Vercel build output
+.vercel

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNIP — URL Shortener</title>
+  <meta name="description" content="Paste any URL, get a clean short link with click analytics.">
+
+  <!-- Fonts: Syne (display) + DM Mono (code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+    input { font-family: inherit; }
+
+    /* ── Tokens — Dark mode (default) ───────────────────────────────────── */
+    :root {
+      --bg:            #06060f;
+      --bg-2:          #0c0c1c;
+      --bg-3:          #111127;
+      --surface:       #0f0f1e;
+      --surface-2:     #181830;
+      --border:        rgba(99,102,241,.12);
+      --border-hover:  rgba(99,102,241,.32);
+      --border-active: rgba(99,102,241,.68);
+      --indigo:        #6366f1;
+      --indigo-lt:     #818cf8;
+      --indigo-dim:    rgba(99,102,241,.08);
+      --indigo-glow:   rgba(99,102,241,.22);
+      --text:          #eef0ff;
+      --text-2:        #b4bad8;
+      --text-3:        #7880a8;
+      --green:         #22d37a;
+      --red:           #ef4455;
+      --font-ui:       'Syne', sans-serif;
+      --font-mono:     'DM Mono', monospace;
+      --r:             8px;
+      --r-lg:          14px;
+      --shadow:        0 4px 24px rgba(0,0,0,.4);
+    }
+
+    /* ── Tokens — Light mode ─────────────────────────────────────────────── */
+    [data-theme="light"] {
+      --bg:            #f4f4fc;
+      --bg-2:          #ffffff;
+      --bg-3:          #ebebf8;
+      --surface:       #ffffff;
+      --surface-2:     #f0f0fa;
+      --border:        rgba(99,102,241,.15);
+      --border-hover:  rgba(99,102,241,.38);
+      --border-active: rgba(99,102,241,.70);
+      --indigo:        #5456e0;
+      --indigo-lt:     #4447c7;
+      --indigo-dim:    rgba(99,102,241,.08);
+      --indigo-glow:   rgba(99,102,241,.18);
+      --text:          #0b0b18;
+      --text-2:        #383858;
+      --text-3:        #6464a0;
+      --green:         #15803d;
+      --red:           #c81e1e;
+      --shadow:        0 4px 24px rgba(99,102,241,.10);
+    }
+
+    /* Light mode background layers */
+    [data-theme="light"] .bg-glow {
+      background:
+        radial-gradient(ellipse 80% 55% at 50% -5%,  rgba(99,102,241,.12) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 80% 100%, rgba(99,102,241,.05) 0%, transparent 60%);
+    }
+    [data-theme="light"] .bg-dots {
+      background-image: radial-gradient(circle, rgba(99,102,241,.10) 1px, transparent 1px);
+    }
+    [data-theme="light"] .bg-grain { opacity: .018; }
+
+    /* ── Base ───────────────────────────────────────────────────────────── */
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── Background: radial glow + dot grid + grain ─────────────────────── */
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 55% at 50% -5%,  rgba(99,102,241,.22) 0%, transparent 68%),
+        radial-gradient(ellipse 40% 30% at 80% 100%, rgba(99,102,241,.08) 0%, transparent 60%);
+    }
+
+    .bg-dots {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(99,102,241,.14) 1px, transparent 1px);
+      background-size: 30px 30px;
+      mask-image: radial-gradient(ellipse 75% 65% at 50% 42%, black 20%, transparent 100%);
+    }
+
+    .bg-grain {
+      position: absolute;
+      inset: 0;
+      opacity: .028;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Config Banner ──────────────────────────────────────────────────── */
+    .cfg-banner {
+      display: none;
+      background: rgba(239,68,85,.09);
+      border-bottom: 1px solid rgba(239,68,85,.22);
+      padding: 9px 24px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #f87171;
+      text-align: center;
+      letter-spacing: .02em;
+    }
+    .cfg-banner.on { display: block; }
+    .cfg-banner code {
+      background: rgba(239,68,85,.12);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      padding: 26px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .logo-mark {
+      width: 30px; height: 30px;
+      background: var(--indigo);
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 18px rgba(99,102,241,.45);
+    }
+
+    .logo-mark svg {
+      width: 15px; height: 15px;
+      stroke: #fff;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      fill: none;
+    }
+
+    .logo-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      color: var(--text);
+    }
+    .logo-name span { color: var(--indigo); }
+
+    .hdr-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hdr-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-3);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 5px 13px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+    }
+
+    /* Theme toggle */
+    .theme-toggle {
+      width: 34px; height: 34px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .2s, border-color .2s;
+      flex-shrink: 0;
+    }
+    .theme-toggle:hover {
+      background: var(--indigo-dim);
+      border-color: var(--border-hover);
+    }
+    .theme-toggle svg {
+      width: 15px; height: 15px;
+      stroke: var(--text-2);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    /* Show sun in dark mode (click → switch to light), moon in light mode */
+    .icon-sun  { display: block; }
+    .icon-moon { display: none; }
+    [data-theme="light"] .icon-sun  { display: none; }
+    [data-theme="light"] .icon-moon { display: block; }
+
+    /* ── Main ───────────────────────────────────────────────────────────── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 70px 20px 80px;
+      gap: 32px;
+      max-width: 660px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Hero ───────────────────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      animation: fadeUp .55s ease both;
+    }
+
+    .hero h1 {
+      font-size: clamp(42px, 8vw, 68px);
+      font-weight: 800;
+      line-height: 1.04;
+      letter-spacing: -.04em;
+      color: var(--text);
+      margin-bottom: 18px;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: transparent;
+      background: linear-gradient(135deg, var(--indigo-lt) 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+    [data-theme="light"] .hero h1 em {
+      background: linear-gradient(135deg, #4447c7 0%, #6366f1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 16px;
+      font-weight: 400;
+      color: var(--text-2);
+      line-height: 1.65;
+      max-width: 380px;
+      margin: 0 auto;
+    }
+
+    /* ── Form Card ──────────────────────────────────────────────────────── */
+    .form-card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 26px;
+      animation: fadeUp .55s .1s ease both;
+      transition: border-color .3s;
+    }
+    .form-card:focus-within { border-color: var(--border-hover); }
+
+    .field-label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 8px;
+    }
+
+    .url-input {
+      display: block;
+      width: 100%;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      caret-color: var(--indigo);
+      margin-bottom: 6px;
+    }
+    .url-input::placeholder { color: var(--text-3); }
+    .url-input:focus {
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px var(--indigo-glow);
+    }
+    .url-input.err {
+      border-color: rgba(239,68,85,.55);
+      box-shadow: 0 0 0 3px rgba(239,68,85,.12);
+    }
+
+    .field-error {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--red);
+      display: none;
+      margin-bottom: 14px;
+    }
+    .field-error.on { display: block; }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 14px 0;
+      cursor: pointer;
+      width: fit-content;
+      user-select: none;
+    }
+
+    .toggle-track {
+      width: 36px; height: 20px;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      position: relative;
+      transition: background .2s, border-color .2s;
+      flex-shrink: 0;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 13px; height: 13px;
+      background: var(--text-3);
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform .2s, background .2s;
+    }
+    .toggle-row.on .toggle-track {
+      background: var(--indigo-dim);
+      border-color: var(--border-active);
+    }
+    .toggle-row.on .toggle-track::after {
+      transform: translateX(16px);
+      background: var(--indigo);
+    }
+    .toggle-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-2);
+      letter-spacing: .04em;
+    }
+
+    /* Alias input */
+    .alias-wrap {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height .3s ease, opacity .25s ease, margin .3s ease;
+    }
+    .alias-wrap.open { max-height: 90px; opacity: 1; margin-bottom: 4px; }
+
+    .alias-row {
+      display: flex;
+      align-items: stretch;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      transition: border-color .2s, box-shadow .2s;
+      margin-bottom: 6px;
+    }
+    .alias-row:focus-within {
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px var(--indigo-glow);
+    }
+
+    .alias-pfx {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-3);
+      padding: 12px 10px 12px 14px;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .alias-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      caret-color: var(--indigo);
+    }
+    .alias-input::placeholder { color: var(--text-3); }
+
+    /* Error banner */
+    .err-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(239,68,85,.07);
+      border: 1px solid rgba(239,68,85,.22);
+      border-radius: var(--r);
+      padding: 11px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #f87171;
+      margin-bottom: 14px;
+    }
+    .err-banner.on { display: flex; }
+    .err-close {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: var(--text-3);
+      font-size: 15px;
+      line-height: 1;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+
+    /* Submit button */
+    .btn-shorten {
+      width: 100%;
+      padding: 15px 24px;
+      background: var(--indigo);
+      border: none;
+      border-radius: var(--r);
+      color: #fff;
+      font-family: var(--font-ui);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -.01em;
+      transition: background .15s, box-shadow .2s, transform .1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-shorten::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.09) 0%, transparent 55%);
+    }
+    .btn-shorten:hover:not(:disabled) {
+      background: #4f52e6;
+      box-shadow: 0 8px 30px rgba(99,102,241,.42);
+      transform: translateY(-1px);
+    }
+    .btn-shorten:active:not(:disabled) { transform: translateY(0); box-shadow: none; }
+    .btn-shorten:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    .btn-shorten.loading .btn-spinner { display: block; }
+    .btn-shorten.loading .btn-lbl { opacity: .75; }
+
+    /* ── Result Card ────────────────────────────────────────────────────── */
+    .result-card {
+      display: none;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      animation: slideUp .38s ease both;
+    }
+    .result-card.on { display: block; }
+
+    .result-hdr {
+      background: var(--indigo-dim);
+      border-bottom: 1px solid var(--border);
+      padding: 11px 20px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .result-dot {
+      width: 7px; height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      flex-shrink: 0;
+    }
+    .result-lbl {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .result-body { padding: 20px; }
+
+    .short-url {
+      font-family: var(--font-mono);
+      font-size: clamp(14px, 2.6vw, 18px);
+      color: var(--indigo-lt);
+      word-break: break-all;
+      line-height: 1.45;
+      margin-bottom: 14px;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: 100px;
+      letter-spacing: .04em;
+    }
+    .pill-clicks {
+      color: var(--indigo-lt);
+      background: var(--indigo-dim);
+      border: 1px solid rgba(99,102,241,.2);
+    }
+    .pill-date {
+      color: var(--text-3);
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+    }
+
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn-act {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: var(--r);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 600;
+      transition: all .15s;
+      border: 1px solid;
+    }
+    .btn-copy {
+      background: var(--indigo-dim);
+      border-color: var(--border-hover);
+      color: var(--indigo-lt);
+    }
+    .btn-copy:hover { background: rgba(99,102,241,.14); border-color: var(--indigo); }
+    .btn-copy.copied {
+      background: rgba(34,211,122,.08);
+      border-color: rgba(34,211,122,.35);
+      color: var(--green);
+    }
+    .btn-open {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-2);
+    }
+    .btn-open:hover { background: var(--bg-3); border-color: var(--border-hover); color: var(--text); }
+
+    /* ── Analytics Section ──────────────────────────────────────────────── */
+    .analytics {
+      width: 100%;
+      animation: fadeUp .55s .2s ease both;
+    }
+
+    .sec-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sec-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .stats-row { display: flex; gap: 8px; }
+
+    .stats-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      caret-color: var(--indigo);
+      min-width: 0;
+    }
+    .stats-input::placeholder { color: var(--text-3); }
+    .stats-input:focus {
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px var(--indigo-glow);
+    }
+
+    .btn-stats {
+      padding: 12px 18px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--r);
+      color: var(--indigo-lt);
+      font-family: var(--font-ui);
+      font-size: 13px;
+      font-weight: 700;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-stats:hover { background: var(--indigo-dim); border-color: var(--indigo); }
+    .btn-stats:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Stats card */
+    .stats-card {
+      display: none;
+      margin-top: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      animation: slideUp .3s ease both;
+    }
+    .stats-card.on { display: block; }
+    .stats-card.err { border-color: rgba(239,68,85,.22); }
+
+    .stats-body { padding: 20px; }
+
+    .stats-orig {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-2);
+      word-break: break-all;
+      line-height: 1.55;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat-box {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px 16px;
+    }
+
+    .stat-val {
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--indigo-lt);
+      line-height: 1;
+      letter-spacing: -.03em;
+      margin-bottom: 5px;
+    }
+    .stat-val.sm {
+      font-size: 15px;
+      letter-spacing: -.01em;
+      line-height: 1.3;
+      word-break: break-all;
+      padding-top: 3px;
+      color: var(--text);
+    }
+    .stat-key {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    .stats-foot {
+      margin-top: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-3);
+      letter-spacing: .04em;
+    }
+
+    .stats-err-msg {
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--red);
+    }
+
+    /* ── Footer ─────────────────────────────────────────────────────────── */
+    footer {
+      padding: 22px 40px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      z-index: 1;
+    }
+    .foot-note {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-3);
+      letter-spacing: .03em;
+    }
+    .foot-note b { color: var(--text-2); font-weight: 400; }
+
+    /* ── Animations ──────────────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Responsive ─────────────────────────────────────────────────────── */
+    @media (max-width: 580px) {
+      header { padding: 18px 18px; }
+      .hdr-badge { display: none; }
+      main { padding: 48px 16px 64px; gap: 24px; }
+      footer { padding: 18px 18px; flex-direction: column; gap: 6px; text-align: center; }
+      .stats-row { flex-direction: column; }
+      .btn-stats { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background layers -->
+<div class="bg-layer">
+  <div class="bg-glow"></div>
+  <div class="bg-dots"></div>
+  <div class="bg-grain"></div>
+</div>
+
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24">
+          <path d="M13.5 6L10 18.5M6.5 8.5l-3 3.5 3 3.5M17.5 8.5l3 3.5-3 3.5"/>
+        </svg>
+      </div>
+      <div class="logo-name">SNIP<span>.</span></div>
+    </div>
+    <div class="hdr-right">
+      <div class="hdr-badge">URL Shortener</div>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <!-- Sun: shown in dark mode → click to go light -->
+        <svg class="icon-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <!-- Moon: shown in light mode → click to go dark -->
+        <svg class="icon-moon" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main>
+
+    <!-- Hero -->
+    <div class="hero">
+      <h1>Long URLs,<br><em>snipped short.</em></h1>
+      <p>Paste any link, get a clean short URL with real-time click analytics.</p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+      <form id="shortenForm" autocomplete="off" novalidate>
+
+        <label class="field-label" for="urlInput">Destination URL</label>
+        <input
+          type="url"
+          id="urlInput"
+          class="url-input"
+          placeholder="https://example.com/some/very/long/path..."
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <div class="field-error" id="urlError">Enter a valid URL starting with https:// or http://</div>
+
+        <!-- Alias toggle -->
+        <div class="toggle-row" id="aliasToggle" role="switch" tabindex="0" aria-checked="false">
+          <div class="toggle-track"></div>
+          <span class="toggle-label">Custom alias</span>
+        </div>
+
+        <!-- Alias input (collapsed by default) -->
+        <div class="alias-wrap" id="aliasWrap">
+          <div class="alias-row" id="aliasRow">
+            <span class="alias-pfx" id="aliasPfx">…/r/</span>
+            <input
+              type="text"
+              id="aliasInput"
+              class="alias-input"
+              placeholder="my-custom-alias"
+              maxlength="50"
+              spellcheck="false"
+              autocomplete="off"
+            />
+          </div>
+          <div class="field-error" id="aliasError">That alias is already taken — try another.</div>
+        </div>
+
+        <!-- Network error banner -->
+        <div class="err-banner" id="errBanner">
+          <span id="errMsg">Network error. Check your n8n URL in CONFIG.</span>
+          <button type="button" class="err-close" id="errClose">✕</button>
+        </div>
+
+        <button type="submit" class="btn-shorten" id="shortenBtn">
+          <div class="btn-spinner"></div>
+          <span class="btn-lbl">Snip URL →</span>
+        </button>
+
+      </form>
+    </div>
+
+    <!-- Result Card (hidden until a URL is shortened) -->
+    <div class="result-card" id="resultCard">
+      <div class="result-hdr">
+        <div class="result-dot"></div>
+        <span class="result-lbl">Link created</span>
+      </div>
+      <div class="result-body">
+        <div class="short-url" id="shortUrl"></div>
+        <div class="meta-row">
+          <span class="pill pill-clicks" id="clicksPill">↗ 0 clicks</span>
+          <span class="pill pill-date"  id="datePill"></span>
+        </div>
+        <div class="action-row">
+          <button class="btn-act btn-copy" id="copyBtn">
+            <span id="copyIco">⎘</span>
+            <span id="copyTxt">Copy URL</span>
+          </button>
+          <a class="btn-act btn-open" id="openBtn" href="#" target="_blank" rel="noopener noreferrer">
+            ↗ Open
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Section -->
+    <div class="analytics">
+      <div class="sec-title">Analytics</div>
+      <div class="stats-row">
+        <input
+          type="text"
+          id="statsInput"
+          class="stats-input"
+          placeholder="Short code — e.g. ab3f9z"
+          spellcheck="false"
+        />
+        <button type="button" class="btn-stats" id="statsBtn">Check Stats →</button>
+      </div>
+
+      <div class="stats-card" id="statsCard">
+        <div class="stats-body" id="statsBody"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="foot-note">SNIP v1.0</div>
+  </footer>
+
+</div>
+
+<script>
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  CONFIGURATION                                                      ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  const CONFIG = {
+    // Vercel serverless proxy — keeps the API key server-side.
+    // Locally: run `vercel dev` so /api/webhook is served.
+    WEBHOOK_URL: '/api/webhook',
+    // Short URL base domain (what gets displayed / copied)
+    SHORT_BASE:  'https://shorturl.zeeshanai.cloud/',
+  };
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /* ── Theme ────────────────────────────────────────────────────────────── */
+  (function initTheme() {
+    const saved = localStorage.getItem('snip-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+
+  /* ── DOM refs ─────────────────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+  const cfgBanner   = $('cfgBanner');
+  const shortenForm = $('shortenForm');
+  const urlInput    = $('urlInput');
+  const urlError    = $('urlError');
+  const aliasToggle = $('aliasToggle');
+  const aliasWrap   = $('aliasWrap');
+  const aliasPfx    = $('aliasPfx');
+  const aliasInput  = $('aliasInput');
+  const aliasError  = $('aliasError');
+  const errBanner   = $('errBanner');
+  const errMsg      = $('errMsg');
+  const errClose    = $('errClose');
+  const shortenBtn  = $('shortenBtn');
+  const resultCard  = $('resultCard');
+  const shortUrl    = $('shortUrl');
+  const clicksPill  = $('clicksPill');
+  const datePill    = $('datePill');
+  const copyBtn     = $('copyBtn');
+  const copyIco     = $('copyIco');
+  const copyTxt     = $('copyTxt');
+  const openBtn     = $('openBtn');
+  const statsInput  = $('statsInput');
+  const statsBtn    = $('statsBtn');
+  const statsCard   = $('statsCard');
+  const statsBody   = $('statsBody');
+
+  /* ── Init ─────────────────────────────────────────────────────────────── */
+
+  // Show the short domain in the alias prefix
+  try {
+    const host = new URL(CONFIG.SHORT_BASE).hostname;
+    aliasPfx.textContent = host + '/';
+  } catch {
+    aliasPfx.textContent = '…/';
+  }
+
+  /* ── Alias toggle ─────────────────────────────────────────────────────── */
+  let aliasOn = false;
+
+  function toggleAlias() {
+    aliasOn = !aliasOn;
+    aliasToggle.classList.toggle('on', aliasOn);
+    aliasToggle.setAttribute('aria-checked', String(aliasOn));
+    aliasWrap.classList.toggle('open', aliasOn);
+    aliasError.classList.remove('on');
+    if (aliasOn) aliasInput.focus();
+  }
+
+  aliasToggle.addEventListener('click', toggleAlias);
+  aliasToggle.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAlias(); }
+  });
+
+  /* ── Validation helpers ───────────────────────────────────────────────── */
+  function isValidUrl(str) {
+    try {
+      const u = new URL(str);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch { return false; }
+  }
+
+  function setUrlErr(show) {
+    urlInput.classList.toggle('err', show);
+    urlError.classList.toggle('on', show);
+  }
+
+  urlInput.addEventListener('input', () => setUrlErr(false));
+
+  /* ── Network ──────────────────────────────────────────────────────────── */
+  async function callWebhook(body) {
+    const res = await fetch(CONFIG.WEBHOOK_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  /* ── Shorten ──────────────────────────────────────────────────────────── */
+  function setLoading(on) {
+    shortenBtn.disabled = on;
+    shortenBtn.classList.toggle('loading', on);
+    urlInput.disabled   = on;
+    aliasInput.disabled = on;
+  }
+
+  function showErrBanner(msg) {
+    errMsg.textContent = msg;
+    errBanner.classList.add('on');
+  }
+
+  errClose.addEventListener('click', () => errBanner.classList.remove('on'));
+
+  /* ── Theme toggle ─────────────────────────────────────────────────────── */
+  $('themeToggle').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('snip-theme', next);
+  });
+
+  function renderResult(data) {
+    const url = data.short_url || (CONFIG.SHORT_BASE + data.short_code);
+    shortUrl.textContent   = url;
+    clicksPill.textContent = `↗ ${data.clicks ?? 0} click${data.clicks === 1 ? '' : 's'}`;
+    datePill.textContent   = data.createdAt ? fmtDate(data.createdAt) : 'Just now';
+    openBtn.href           = url;
+    resultCard.classList.add('on');
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  shortenForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    errBanner.classList.remove('on');
+    aliasError.classList.remove('on');
+
+    const url = urlInput.value.trim();
+    if (!isValidUrl(url)) { setUrlErr(true); urlInput.focus(); return; }
+
+    const alias = aliasOn ? aliasInput.value.trim() : '';
+    const body  = { event_type: 'short_url', url };
+    if (alias) body.alias = alias;
+
+    setLoading(true);
+    try {
+      const data = await callWebhook(body);
+      if (data.success === false) {
+        if (data.error === 'alias_taken') {
+          aliasError.classList.add('on');
+        } else {
+          showErrBanner(data.message || 'Something went wrong — please try again.');
+        }
+      } else {
+        renderResult(data);
+      }
+    } catch {
+      showErrBanner('Network error — check your webhook URL or API key in CONFIG.');
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  /* ── Copy to clipboard ────────────────────────────────────────────────── */
+  let copyTimer;
+
+  copyBtn.addEventListener('click', async () => {
+    const text = shortUrl.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = Object.assign(document.createElement('textarea'), {
+        value: text, style: 'position:fixed;opacity:0'
+      });
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    copyBtn.classList.add('copied');
+    copyIco.textContent = '✓';
+    copyTxt.textContent = 'Copied!';
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      copyBtn.classList.remove('copied');
+      copyIco.textContent = '⎘';
+      copyTxt.textContent = 'Copy URL';
+    }, 2200);
+  });
+
+  /* ── Stats ────────────────────────────────────────────────────────────── */
+  function renderStats(d) {
+    statsCard.className = 'stats-card on';
+    statsBody.innerHTML = `
+      <div class="stats-orig">${esc(d.original_url || '—')}</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val">${d.clicks ?? 0}</div>
+          <div class="stat-key">Total clicks</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val sm">${esc(d.short_code || '—')}</div>
+          <div class="stat-key">Short code</div>
+        </div>
+      </div>
+      ${d.createdAt
+        ? `<div class="stats-foot">Created ${fmtDate(d.createdAt)}</div>`
+        : ''}
+    `;
+  }
+
+  function renderStatsErr(msg) {
+    statsCard.className = 'stats-card on err';
+    statsBody.innerHTML = `<div class="stats-err-msg">${esc(msg)}</div>`;
+  }
+
+  async function checkStats() {
+    const code = statsInput.value.trim();
+    if (!code) { statsInput.focus(); return; }
+
+    statsBtn.disabled     = true;
+    statsBtn.textContent  = 'Loading…';
+    try {
+      const data = await callWebhook({ event_type: 'stats', short_code: code });
+      if (data.success === false) {
+        renderStatsErr(data.message || 'No record found for that short code.');
+      } else {
+        renderStats(data);
+        statsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    } catch {
+      renderStatsErr('Network error — could not reach n8n. Check your CONFIG.');
+    } finally {
+      statsBtn.disabled    = false;
+      statsBtn.textContent = 'Check Stats →';
+    }
+  }
+
+  statsBtn.addEventListener('click', checkStats);
+  statsInput.addEventListener('keydown', e => { if (e.key === 'Enter') checkStats(); });
+
+  /* ── Helpers ──────────────────────────────────────────────────────────── */
+  function fmtDate(iso) {
+    try {
+      return new Date(iso).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
+      });
+    } catch { return iso; }
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
