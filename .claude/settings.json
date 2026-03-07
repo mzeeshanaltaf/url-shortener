@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//e/Projects/Claude Code/**)",
+      "Bash(dir \"e:\\\\Projects\\\\Claude Code\\\\URL Shortener\\\\n8n-workflows\")"
+    ]
+  }
+}

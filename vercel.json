@@ -3,6 +3,13 @@
     "api/webhook.js": {
       "memory": 128,
       "maxDuration": 15
+    },
+    "api/redirect.js": {
+      "memory": 128,
+      "maxDuration": 10
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/:code([a-zA-Z0-9_-]+)", "destination": "/api/redirect?code=:code" }
+  ]
 }
