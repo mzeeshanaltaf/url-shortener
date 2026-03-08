@@ -1047,8 +1047,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+    const data = await res.json();
+    // Treat HTTP errors that carry no JSON body as network failures
+    if (!res.ok && data.success === undefined && data.error === undefined) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return data;
   }
 
   /* ── Shorten ──────────────────────────────────────────────────────────── */
