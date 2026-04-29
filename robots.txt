@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /$
+Allow: /og-image.png
+Allow: /apple-touch-icon.png
+Allow: /manifest.json
+Allow: /sitemap.xml
+Disallow: /api/
+Disallow: /
+
+Sitemap: https://shorturl.zeeshanai.cloud/sitemap.xml

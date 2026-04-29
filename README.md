@@ -13,6 +13,7 @@ A clean, single-page URL shortener with click analytics. Built with vanilla HTML
 - **Click analytics** — Look up how many times any short URL has been clicked
 - **Dark / Light mode** — Toggle with one click, preference saved in localStorage
 - **Secure by design** — API key never exposed to the browser (Vercel proxy)
+- **SEO ready** — Open Graph, Twitter Card, JSON-LD schema, sitemap, and web manifest
 
 ## Tech Stack
 
@@ -28,11 +29,17 @@ A clean, single-page URL shortener with click analytics. Built with vanilla HTML
 
 ```
 url-shortener/
-├── index.html          # Full SPA — all UI, styles, and logic
+├── index.html              # Full SPA — all UI, styles, and logic
 ├── api/
-│   └── webhook.js      # Vercel serverless proxy (injects API key server-side)
-├── vercel.json         # Vercel function config
-├── config.example.js   # Template for local development config
+│   ├── webhook.js          # Vercel serverless proxy (injects API key server-side)
+│   └── redirect.js         # Vercel serverless function for short URL redirects
+├── vercel.json             # Vercel function config + cache/security headers
+├── robots.txt              # Crawl rules (homepage only; blocks short-code paths)
+├── sitemap.xml             # Single-URL sitemap
+├── manifest.json           # PWA web manifest
+├── og-image.png            # Open Graph / Twitter Card image (1200×630)
+├── apple-touch-icon.png    # iOS home screen icon (180×180)
+├── config.example.js       # Template for local development config
 └── .gitignore
 ```
 
