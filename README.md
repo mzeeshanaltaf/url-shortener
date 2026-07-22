@@ -1,9 +1,9 @@
 # SNIP — URL Shortener
 
-A clean, single-page URL shortener with click analytics. Built with vanilla HTML/CSS/JS, deployed on Vercel, and powered by n8n webhooks as the backend.
+A clean, single-page URL shortener with click analytics. Built with vanilla HTML/CSS/JS, served by a zero-dependency Node server, self-hosted on Coolify, and powered by n8n webhooks as the backend.
 
 ![Dark Mode](https://img.shields.io/badge/theme-dark%20%2F%20light-6366f1)
-![Deployed on Vercel](https://img.shields.io/badge/deployed%20on-Vercel-black)
+![Self-hosted on Coolify](https://img.shields.io/badge/self--hosted-Coolify-8b5cf6)
 ![Backend](https://img.shields.io/badge/backend-n8n-orange)
 
 ## Features
@@ -12,7 +12,8 @@ A clean, single-page URL shortener with click analytics. Built with vanilla HTML
 - **Custom aliases** — Choose your own short code (e.g. `/my-link`)
 - **Click analytics** — Look up how many times any short URL has been clicked
 - **Dark / Light mode** — Toggle with one click, preference saved in localStorage
-- **Secure by design** — API key never exposed to the browser (Vercel proxy)
+- **Secure by design** — API key never exposed to the browser (server-side proxy)
+- **Privacy analytics** — Self-hosted, cookieless Umami page-view tracking
 - **SEO ready** — Open Graph, Twitter Card, JSON-LD schema, sitemap, and web manifest
 
 ## Tech Stack
@@ -21,61 +22,63 @@ A clean, single-page URL shortener with click analytics. Built with vanilla HTML
 |---|---|
 | Frontend | Vanilla HTML, CSS, JavaScript (single file) |
 | Fonts | Syne (display) + DM Mono (monospace) via Google Fonts |
-| Deployment | Vercel (static + serverless function) |
+| Server | Zero-dependency Node.js (`server.js`, Node ≥ 20 built-ins only) |
+| Container | Docker (`node:22-alpine`) |
+| Deployment | Coolify on a Hostinger VPS (auto-deploy via GitHub Actions) |
 | Backend | n8n webhooks |
+| Analytics | Self-hosted Umami |
 | Short URL domain | `shorturl.zeeshanai.cloud` |
+
+## How It Works
+
+One Node process owns the whole domain:
+
+- `GET /` and static assets → served from the repo root with cache/security headers
+- `POST /api/webhook` → proxies to n8n, injecting the `N8N_API_KEY` header server-side
+- `GET /:code` (and `GET /api/redirect?code=…`) → proxies to n8n, relaying its `302` to the original URL
+
+> The `api/` folder and `vercel.json` are retained only for reference / Vercel rollback; the live server is `server.js`.
 
 ## Project Structure
 
 ```
 url-shortener/
+├── server.js               # Node server — static files + /api/webhook + /:code redirect
+├── package.json            # No dependencies; `npm start` runs server.js
+├── Dockerfile              # node:22-alpine image (used by Coolify)
+├── .dockerignore
 ├── index.html              # Full SPA — all UI, styles, and logic
-├── api/
-│   ├── webhook.js          # Vercel serverless proxy (injects API key server-side)
-│   └── redirect.js         # Vercel serverless function for short URL redirects
-├── vercel.json             # Vercel function config + cache/security headers
 ├── robots.txt              # Crawl rules (homepage only; blocks short-code paths)
 ├── sitemap.xml             # Single-URL sitemap
 ├── manifest.json           # PWA web manifest
 ├── og-image.png            # Open Graph / Twitter Card image (1200×630)
 ├── apple-touch-icon.png    # iOS home screen icon (180×180)
-├── config.example.js       # Template for local development config
-└── .gitignore
+├── .github/workflows/
+│   └── deploy.yml          # Auto-deploy to Coolify on push to main
+├── api/, vercel.json       # Legacy Vercel setup (kept for rollback)
+└── config.example.js       # Template for local config
 ```
 
 ## Local Development
 
-1. Install the [Vercel CLI](https://vercel.com/docs/cli):
-   ```bash
-   npm i -g vercel
-   ```
+No build step and no dependencies — just Node ≥ 20:
 
-2. Create a local environment file:
-   ```bash
-   cp config.example.js config.js   # for reference only
-   ```
-   Then create `.env.local`:
-   ```
-   N8N_API_KEY=your_api_key_here
-   ```
+```bash
+N8N_API_KEY=your_api_key_here node server.js
+# → http://localhost:3000
+```
 
-3. Run locally (serves both the HTML and the `/api/webhook` proxy):
-   ```bash
-   vercel dev
-   ```
+`PORT` is configurable (defaults to `3000`).
 
-## Vercel Deployment
+## Deployment (Coolify)
 
-1. Push this repo to GitHub.
+Deployed on Coolify (Hostinger VPS) as a Docker application:
 
-2. Import the project in the [Vercel dashboard](https://vercel.com/new).
-
-3. Add the environment variable:
-   - **Name:** `N8N_API_KEY`
-   - **Value:** your n8n API key
-   - **Environments:** Production, Preview, Development
-
-4. Deploy — Vercel auto-detects the `api/` folder and the static `index.html`.
+- **Build pack:** Dockerfile (`node:22-alpine`) · **Exposed port:** `3000`
+- **Env vars:** `N8N_API_KEY` (runtime secret), `NODE_ENV=production`
+- **Domain:** `shorturl.zeeshanai.cloud` with automatic Let's Encrypt SSL
+- **Auto-deploy:** pushing to `main` triggers `.github/workflows/deploy.yml`, which
+  calls the Coolify deploy API (repo secrets `COOLIFY_API_TOKEN` + `COOLIFY_APP_UUID`)
 
 ## n8n Webhook Setup
 
@@ -130,9 +133,9 @@ GET https://your-n8n-instance.com/webhook/<redirect-webhook-id>/r/<short_code>
 
 ## Security
 
-- The `x-api-key` header is added by the **Vercel serverless function** (`api/webhook.js`), not the browser
-- The API key is stored as a **Vercel environment variable** (`N8N_API_KEY`)
-- `config.js` (for local dev) is gitignored and never committed
+- The `x-api-key` header is added by the **Node server** (`server.js`), never the browser
+- The API key is stored as the `N8N_API_KEY` environment variable (a Coolify runtime secret)
+- `.env.local` and `config.js` are gitignored and never committed
 
 ## License
 
