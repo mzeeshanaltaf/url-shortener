@@ -1,0 +1,12 @@
+{
+  "name": "snip-url-shortener",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SNIP — self-hostable URL shortener frontend + n8n proxy (Node, zero deps)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

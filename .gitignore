@@ -1,5 +1,12 @@
 # Private config used only for local testing (not needed for Vercel deployment)
 config.js
 
+# Local env / secrets (Coolify tokens, Umami config)
+.env.local
+.env
+
+# Dependencies
+node_modules
+
 # Vercel build output
 .vercel
